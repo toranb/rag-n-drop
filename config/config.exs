@@ -7,6 +7,9 @@
 # General application configuration
 import Config
 
+config :replicate,
+  replicate_api_token: System.get_env("REPLICATE_API_TOKEN")
+
 config :demo,
   ecto_repos: [Demo.Repo],
   generators: [timestamp_type: :utc_datetime]

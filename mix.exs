@@ -32,6 +32,11 @@ defmodule Demo.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:replicate, "~> 1.1.1"},
+      {:pgvector, "~> 0.2.0"},
+      {:bumblebee, "~> 0.4.2"},
+      {:exla, "~> 0.6"},
+      {:nx, "~> 0.6"},
       {:phoenix, "~> 1.7.9"},
       {:phoenix_ecto, "~> 4.4"},
       {:ecto_sql, "~> 3.10"},
