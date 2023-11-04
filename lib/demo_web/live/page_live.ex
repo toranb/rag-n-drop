@@ -24,6 +24,11 @@ defmodule DemoWeb.PageLive do
   end
 
   @impl true
+  def handle_event("remove_pdf", _, %{assigns: %{loadingpdf: true}} = socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("remove_pdf", _, socket) do
     {:noreply, assign(socket, path: nil)}
   end
@@ -40,6 +45,11 @@ defmodule DemoWeb.PageLive do
   def handle_event("change_text", %{"message" => text}, socket) do
     socket = socket |> assign(text: text)
 
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("add_message", _, %{assigns: %{loadingpdf: true}} = socket) do
     {:noreply, socket}
   end
 
@@ -276,8 +286,8 @@ defmodule DemoWeb.PageLive do
                             </div>
                             <span class="truncate"><%= String.split(@path, "/") |> List.last() %></span>
                           </div>
-                          <button type="button" phx-click="remove_pdf" class="p-1 absolute -top-2 -right-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border border-gray-300 shadow" title="Delete">
-                            <div :if={@loadingpdf} class="text-gray-700 inline-block h-4 w-4 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                          <button type="button" phx-click="remove_pdf" class="flex p-1 absolute -top-2 -right-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border border-gray-300 shadow" title="Delete">
+                            <div :if={@loadingpdf} class="text-gray-700 inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
                               <span class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
                             </div>
                             <svg :if={!@loadingpdf} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="h-4 w-4 text-gray-700">
