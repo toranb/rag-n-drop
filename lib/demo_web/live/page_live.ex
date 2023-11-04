@@ -12,7 +12,7 @@ defmodule DemoWeb.PageLive do
 
     socket =
       socket
-      |> assign(lookup: nil, filename: nil, messages: messages, version: version, documents: documents, result: nil, text: nil, ocr: nil, loading: false, selected: nil, query: nil, transformer: nil, llama: nil, path: nil, focused: false, loadingpdf: false)
+      |> assign(task: nil, lookup: nil, filename: nil, messages: messages, version: version, documents: documents, result: nil, text: nil, loading: false, selected: nil, query: nil, transformer: nil, llama: nil, path: nil, focused: false, loadingpdf: false)
       |> allow_upload(:document, accept: ~w(.pdf), progress: &handle_progress/3, auto_upload: true, max_entries: 1)
 
     {:ok, socket}
@@ -108,17 +108,7 @@ defmodule DemoWeb.PageLive do
   end
 
   @impl true
-  def handle_info({ref, _}, socket) when socket.assigns.query.ref == ref do
-    ocr =
-      Task.async(fn ->
-        System.cmd("tesseract", ~w(demo-1.png stdout))
-      end)
-
-    {:noreply, assign(socket, query: nil, ocr: ocr)}
-  end
-
-  @impl true
-  def handle_info({ref, {context, 0}}, socket) when socket.assigns.ocr.ref == ref do
+  def handle_info({ref, results}, socket) when socket.assigns.task.ref == ref do
     filename = socket.assigns.filename
 
     document =
@@ -126,19 +116,33 @@ defmodule DemoWeb.PageLive do
       |> Demo.Document.changeset(%{title: filename, machine: "test"})
       |> Repo.insert!()
 
-    section =
+    results
+    |> Enum.reject(fn {text, _filepath, _embedding} -> text == "" end)
+    |> Enum.each(fn {text, filepath, embedding} ->
+      page = Regex.replace(~r/(?<p>)^(.*-)/, filepath, "\\1") |> String.replace(".png", "")
       %Demo.Section{}
-      |> Demo.Section.changeset(%{page: 1, text: context, document_id: document.id})
+      |> Demo.Section.changeset(%{page: page, text: text, document_id: document.id, embedding: embedding})
       |> Repo.insert!()
-
-    transformer =
-      Task.async(fn ->
-        {section, Nx.Serving.batched_run(SentenceTransformer, context)}
-      end)
+    end)
 
     documents = Demo.Document |> Repo.all() |> Repo.preload(:sections)
-    socket = socket |> assign(ocr: nil, documents: documents, selected: document, transformer: transformer, filename: nil)
+    socket = socket |> assign(documents: documents, selected: document, loadingpdf: false, task: nil, filename: nil)
 
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({ref, {directory, {"", 0}}}, socket) when socket.assigns.query.ref == ref do
+    task =
+      document_embeddings(directory, fn text, filepath, embedding ->
+        {text, filepath, embedding}
+      end)
+
+    {:noreply, assign(socket, query: nil, task: task)}
+  end
+
+  @impl true
+  def handle_info({ref, {_directory, _result}}, socket) when socket.assigns.query.ref == ref do
     {:noreply, socket}
   end
 
@@ -169,15 +173,44 @@ defmodule DemoWeb.PageLive do
       end)
       |> List.first()
 
+    id = :rand.uniform(1000)
+    directory = "priv/pdf/#{id}"
+    File.mkdir_p!(directory)
+
     query =
       Task.async(fn ->
-        System.cmd("pdftoppm", [path] ++ ~w(demo -png))
+        {directory, System.cmd("pdftoppm", [path, "#{directory}/image", "-png"])}
       end)
 
     {:noreply, assign(socket, path: path, query: query, filename: filename, loadingpdf: true)}
   end
 
   def handle_progress(_name, _entry, socket), do: {:noreply, socket}
+
+  def document_embeddings(directory, func) do
+    Task.async(fn ->
+      Path.wildcard("#{directory}/*.png")
+      |> Task.async_stream(fn filepath ->
+        System.cmd("tesseract", [filepath] ++ ~w(stdout))
+        |> case do
+          {"", 0} ->
+            {"", filepath, %{embedding: []}}
+
+          {text, 0} ->
+            {text, filepath, Nx.Serving.batched_run(SentenceTransformer, text)}
+
+          _ ->
+            {"", filepath, %{embedding: []}}
+        end
+        end,
+        max_concurrency: 4,
+        timeout: :infinity
+      )
+      |> Enum.map(fn {:ok, {text, filepath, %{embedding: embedding}}} ->
+        func.(text, filepath, embedding)
+      end)
+    end)
+  end
 
   @impl true
   def render(assigns) do
@@ -244,7 +277,10 @@ defmodule DemoWeb.PageLive do
                             <span class="truncate"><%= String.split(@path, "/") |> List.last() %></span>
                           </div>
                           <button type="button" phx-click="remove_pdf" class="p-1 absolute -top-2 -right-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border border-gray-300 shadow" title="Delete">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="h-4 w-4 text-gray-700">
+                            <div :if={@loadingpdf} class="text-gray-700 inline-block h-4 w-4 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                              <span class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
+                            </div>
+                            <svg :if={!@loadingpdf} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="h-4 w-4 text-gray-700">
                               <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                             </svg>
                           </button>
