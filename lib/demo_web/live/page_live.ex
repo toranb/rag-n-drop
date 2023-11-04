@@ -60,7 +60,7 @@ defmodule DemoWeb.PageLive do
 
     lookup =
       Task.async(fn ->
-        {question, Nx.Serving.batched_run(SentenceTransformer, question)}
+        {selected, question, Nx.Serving.batched_run(SentenceTransformer, question)}
       end)
 
     messages = socket.assigns.messages
@@ -70,10 +70,10 @@ defmodule DemoWeb.PageLive do
   end
 
   @impl true
-  def handle_info({ref, {question, %{embedding: embedding}}}, socket) when socket.assigns.lookup.ref == ref do
+  def handle_info({ref, {selected, question, %{embedding: embedding}}}, socket) when socket.assigns.lookup.ref == ref do
     version = socket.assigns.version
 
-    %Demo.Section{text: text, document_id: document_id} = Demo.Section.search(embedding)
+    %Demo.Section{text: text, document_id: document_id} = Demo.Section.search_document(selected.id, embedding)
     document = socket.assigns.documents |> Enum.find(&(&1.id == document_id))
 
     prompt = """

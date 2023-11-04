@@ -26,10 +26,13 @@ defmodule Demo.Section do
     |> validate_required(@required_attrs)
   end
 
-  def search(embedding) do
-    Demo.Repo.all(
-      from s in Section, order_by: max_inner_product(s.embedding, ^embedding), limit: 1
+  def search_document(document_id, embedding) do
+    from(s in Section,
+      where: s.document_id == ^document_id,
+      order_by: max_inner_product(s.embedding, ^embedding),
+      limit: 1
     )
+    |> Demo.Repo.all()
     |> List.first()
   end
 end
