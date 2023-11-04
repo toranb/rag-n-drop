@@ -55,13 +55,16 @@ defmodule DemoWeb.PageLive do
 
   @impl true
   def handle_event("add_message", %{"message" => question}, socket) do
+    selected = socket.assigns.selected
+    message_id = Ecto.UUID.generate()
+
     lookup =
       Task.async(fn ->
         {question, Nx.Serving.batched_run(SentenceTransformer, question)}
       end)
 
     messages = socket.assigns.messages
-    new_messages = messages ++ [%{user_id: 1, text: question, inserted_at: DateTime.utc_now()}]
+    new_messages = messages ++ [%{id: message_id, user_id: 1, text: question, inserted_at: DateTime.utc_now(), document_id: selected.id}]
 
     {:noreply, assign(socket, lookup: lookup, messages: new_messages, loading: true, text: nil)}
   end
@@ -93,9 +96,13 @@ defmodule DemoWeb.PageLive do
 
   @impl true
   def handle_info({ref, {:ok, prediction}}, socket) when socket.assigns.llama.ref == ref do
-    text = Enum.join(prediction.output)
+    message_id = Ecto.UUID.generate()
     messages = socket.assigns.messages
-    new_messages = messages ++ [%{user_id: nil, text: text, inserted_at: DateTime.utc_now()}]
+    selected = socket.assigns.selected
+
+    text = Enum.join(prediction.output)
+
+    new_messages = messages ++ [%{id: message_id, document_id: selected.id, user_id: nil, text: text, inserted_at: DateTime.utc_now()}]
 
     {:noreply, assign(socket, llama: nil, loading: false, messages: new_messages)}
   end
@@ -206,7 +213,7 @@ defmodule DemoWeb.PageLive do
                 <div class="flex absolute inset-0 flex-col">
                   <div class="relative flex grow overflow-y-hidden">
                     <div :if={!is_nil(@selected)} class="pt-4 pb-1 px-4 flex flex-col grow overflow-y-auto">
-                      <%= for message <- @messages do %>
+                      <%= for message <- Enum.filter(@messages, fn m -> m.document_id == @selected.id end) do %>
                       <div :if={message.user_id != 1} class="my-2 flex flex-row justify-start space-x-1 self-start items-start">
                         <div class="flex flex-col space-y-0.5 self-start items-start">
                           <div class="bg-gray-200 text-gray-900 ml-0 mr-12 py-2 px-3 inline-flex text-sm rounded-lg whitespace-pre-wrap"><%= message.text %></div>
