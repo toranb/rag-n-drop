@@ -64,7 +64,7 @@ defmodule DemoWeb.PageLive do
       end)
 
     messages = socket.assigns.messages
-    new_messages = messages ++ [%{id: message_id, user_id: 1, text: question, inserted_at: DateTime.utc_now(), document_id: selected.id}]
+    new_messages = messages ++ [%{id: message_id, user_id: 1, text: question, url: nil, inserted_at: DateTime.utc_now(), document_id: selected.id}]
 
     {:noreply, assign(socket, lookup: lookup, messages: new_messages, loading: true, text: nil)}
   end
@@ -73,8 +73,8 @@ defmodule DemoWeb.PageLive do
   def handle_info({ref, {selected, question, %{embedding: embedding}}}, socket) when socket.assigns.lookup.ref == ref do
     version = socket.assigns.version
 
-    %Demo.Section{text: text, document_id: document_id} = Demo.Section.search_document(selected.id, embedding)
-    document = socket.assigns.documents |> Enum.find(&(&1.id == document_id))
+    section = Demo.Section.search_document(selected.id, embedding)
+    document = socket.assigns.documents |> Enum.find(&(&1.id == section.document_id))
 
     prompt = """
     [INST] <<SYS>>
@@ -82,27 +82,33 @@ defmodule DemoWeb.PageLive do
     If you do not know the answer, just say that you don't know. Use two sentences maximum and keep the answer concise.
     <</SYS>>
     Question: #{question}
-    Context: #{text}[/INST]
+    Context: #{section.text}[/INST]
     """
 
     llama =
       Task.async(fn ->
         {:ok, prediction} = Replicate.Predictions.create(version, %{prompt: prompt})
-        Replicate.Predictions.wait(prediction)
+        {section, Replicate.Predictions.wait(prediction)}
       end)
 
     {:noreply, assign(socket, lookup: nil, llama: llama, selected: document)}
   end
 
   @impl true
-  def handle_info({ref, {:ok, prediction}}, socket) when socket.assigns.llama.ref == ref do
+  def handle_info({ref, {section, {:ok, prediction}}}, socket) when socket.assigns.llama.ref == ref do
     message_id = Ecto.UUID.generate()
+    image_id = Ecto.UUID.generate()
+
     messages = socket.assigns.messages
     selected = socket.assigns.selected
 
-    text = Enum.join(prediction.output)
+    text = Enum.join(prediction.output) <> " You can find more details on page #{section.page}."
+    previous = Demo.Section |> Demo.Repo.get_by!(document_id: section.document_id, page: section.page - 1)
 
-    new_messages = messages ++ [%{id: message_id, document_id: selected.id, user_id: nil, text: text, inserted_at: DateTime.utc_now()}]
+    now = DateTime.utc_now()
+    message = %{id: message_id, document_id: selected.id, user_id: nil, text: text, url: nil, inserted_at: now}
+    image = %{id: image_id, document_id: selected.id, user_id: nil, text: nil, url: previous.filepath, inserted_at: now}
+    new_messages = messages ++ [message, image]
 
     {:noreply, assign(socket, llama: nil, loading: false, messages: new_messages)}
   end
@@ -121,7 +127,7 @@ defmodule DemoWeb.PageLive do
     |> Enum.each(fn {text, filepath, embedding} ->
       page = Regex.replace(~r/(?<p>)^(.*-)/, filepath, "\\1") |> String.replace(".png", "")
       %Demo.Section{}
-      |> Demo.Section.changeset(%{page: page, text: text, document_id: document.id, embedding: embedding})
+      |> Demo.Section.changeset(%{filepath: filepath, page: page, text: text, document_id: document.id, embedding: embedding})
       |> Repo.insert!()
     end)
 
@@ -248,7 +254,11 @@ defmodule DemoWeb.PageLive do
                     <div :if={!is_nil(@selected)} class="pt-4 pb-1 px-4 flex flex-col grow overflow-y-auto">
                       <%= for message <- Enum.filter(@messages, fn m -> m.document_id == @selected.id end) do %>
                       <div :if={message.user_id != 1} class="my-2 flex flex-row justify-start space-x-1 self-start items-start">
-                        <div class="flex flex-col space-y-0.5 self-start items-start">
+                        <div :if={!is_nil(message.url)} class="flex flex-col space-y-0.5 self-start items-start">
+                          <a class="inline-flex self-start items-start" href={"/#{message.url}"} target="_blank" rel="noreferrer"><img class="rounded-lg max-w-44 xs:max-w-56 sm:max-w-72 max-h-52" src={"/#{message.url}"} alt="photo"></a>
+                          <div class="mx-1 text-xs text-gray-500"><%= Calendar.strftime(message.inserted_at, "%B %d, %-I:%M %p") %></div>
+                        </div>
+                        <div :if={is_nil(message.url)} class="flex flex-col space-y-0.5 self-start items-start">
                           <div class="bg-gray-200 text-gray-900 ml-0 mr-12 py-2 px-3 inline-flex text-sm rounded-lg whitespace-pre-wrap"><%= message.text %></div>
                           <div class="mx-1 text-xs text-gray-500"><%= Calendar.strftime(message.inserted_at, "%B %d, %-I:%M %p") %></div>
                         </div>

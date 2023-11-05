@@ -10,6 +10,7 @@ defmodule Demo.Section do
   schema "sections" do
     field(:page, :integer)
     field(:text, :string)
+    field(:filepath, :string)
     field(:embedding, Pgvector.Ecto.Vector)
 
     belongs_to(:document, Demo.Document)
@@ -17,7 +18,7 @@ defmodule Demo.Section do
     timestamps()
   end
 
-  @required_attrs [:page, :text, :document_id]
+  @required_attrs [:page, :text, :document_id, :filepath]
   @optional_attrs [:embedding]
 
   def changeset(section, params \\ %{}) do
