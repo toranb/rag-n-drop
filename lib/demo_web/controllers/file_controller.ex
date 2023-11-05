@@ -17,7 +17,7 @@ defmodule DemoWeb.FileController do
   @doc false
   def content_type_for_file(path) do
     case Path.extname(path) do
-      ".pdf" -> "application/pdf"
+      ".png" -> "image/png"
       _ -> "application/octet-stream"
     end
   end
