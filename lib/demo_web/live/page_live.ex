@@ -24,16 +24,6 @@ defmodule DemoWeb.PageLive do
   end
 
   @impl true
-  def handle_event("remove_pdf", _, %{assigns: %{loadingpdf: true}} = socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("remove_pdf", _, socket) do
-    {:noreply, assign(socket, path: nil)}
-  end
-
-  @impl true
   def handle_event("select_document", %{"id" => document_id}, socket) do
     document = socket.assigns.documents |> Enum.find(&(&1.id == String.to_integer(document_id)))
     socket = socket |> assign(selected: document, result: nil)
@@ -286,14 +276,11 @@ defmodule DemoWeb.PageLive do
                             </div>
                             <span class="truncate"><%= String.split(@path, "/") |> List.last() %></span>
                           </div>
-                          <button type="button" phx-click="remove_pdf" class="flex p-1 absolute -top-2 -right-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border border-gray-300 shadow" title="Delete">
-                            <div :if={@loadingpdf} class="text-gray-700 inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                          <div :if={@loadingpdf} class="flex p-1 absolute -top-2 -right-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border border-gray-300 shadow">
+                            <div class="text-gray-700 inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
                               <span class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
                             </div>
-                            <svg :if={!@loadingpdf} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="h-4 w-4 text-gray-700">
-                              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                            </svg>
-                          </button>
+                          </div>
                         </div>
                       </div>
                       <div class="relative flex grow">
