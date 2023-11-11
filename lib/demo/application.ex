@@ -36,7 +36,7 @@ defmodule Demo.Application do
   end
 
   def serving() do
-    repo = "thenlper/gte-base"
+    repo = "BAAI/bge-small-en-v1.5"
     {:ok, model_info} = Bumblebee.load_model({:hf, repo})
     {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, repo})
 

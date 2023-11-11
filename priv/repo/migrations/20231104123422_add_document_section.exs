@@ -12,7 +12,7 @@ defmodule Demo.Repo.Migrations.AddDocumentSection do
     create table(:sections) do
       add :page, :integer, null: false
       add :text, :text, null: false
-      add :embedding, :vector, size: 768
+      add :embedding, :vector, size: 384
 
       add :document_id, references(:documents), null: false
 
