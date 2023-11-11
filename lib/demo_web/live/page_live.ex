@@ -64,7 +64,7 @@ defmodule DemoWeb.PageLive do
       end)
 
     messages = socket.assigns.messages
-    new_messages = messages ++ [%{id: message_id, user_id: 1, text: question, url: nil, inserted_at: DateTime.utc_now(), document_id: selected.id}]
+    new_messages = messages ++ [%{id: message_id, user_id: 1, text: question, inserted_at: DateTime.utc_now(), document_id: selected.id}]
 
     {:noreply, assign(socket, lookup: lookup, messages: new_messages, loading: true, text: nil)}
   end
@@ -97,18 +97,15 @@ defmodule DemoWeb.PageLive do
   @impl true
   def handle_info({ref, {section, {:ok, prediction}}}, socket) when socket.assigns.llama.ref == ref do
     message_id = Ecto.UUID.generate()
-    image_id = Ecto.UUID.generate()
 
     messages = socket.assigns.messages
     selected = socket.assigns.selected
 
     text = Enum.join(prediction.output) <> " You can find more details on page #{section.page}."
-    previous = Demo.Section |> Demo.Repo.get_by!(document_id: section.document_id, page: section.page - 1)
 
     now = DateTime.utc_now()
-    message = %{id: message_id, document_id: selected.id, user_id: nil, text: text, url: nil, inserted_at: now}
-    image = %{id: image_id, document_id: selected.id, user_id: nil, text: nil, url: previous.filepath, inserted_at: now}
-    new_messages = messages ++ [message, image]
+    message = %{id: message_id, document_id: selected.id, user_id: nil, text: text, inserted_at: now}
+    new_messages = messages ++ [message]
 
     {:noreply, assign(socket, llama: nil, loading: false, messages: new_messages)}
   end
@@ -254,11 +251,7 @@ defmodule DemoWeb.PageLive do
                     <div :if={!is_nil(@selected)} class="pt-4 pb-1 px-4 flex flex-col grow overflow-y-auto">
                       <%= for message <- Enum.filter(@messages, fn m -> m.document_id == @selected.id end) do %>
                       <div :if={message.user_id != 1} class="my-2 flex flex-row justify-start space-x-1 self-start items-start">
-                        <div :if={!is_nil(message.url)} class="flex flex-col space-y-0.5 self-start items-start">
-                          <a class="inline-flex self-start items-start" href={"/#{message.url}"} target="_blank" rel="noreferrer"><img class="rounded-lg max-w-44 xs:max-w-56 sm:max-w-72 max-h-52" src={"/#{message.url}"} alt="photo"></a>
-                          <div class="mx-1 text-xs text-gray-500"><%= Calendar.strftime(message.inserted_at, "%B %d, %-I:%M %p") %></div>
-                        </div>
-                        <div :if={is_nil(message.url)} class="flex flex-col space-y-0.5 self-start items-start">
+                        <div class="flex flex-col space-y-0.5 self-start items-start">
                           <div class="bg-gray-200 text-gray-900 ml-0 mr-12 py-2 px-3 inline-flex text-sm rounded-lg whitespace-pre-wrap"><%= message.text %></div>
                           <div class="mx-1 text-xs text-gray-500"><%= Calendar.strftime(message.inserted_at, "%B %d, %-I:%M %p") %></div>
                         </div>
@@ -294,7 +287,7 @@ defmodule DemoWeb.PageLive do
                         </div>
                       </div>
                       <div class="relative flex grow">
-                        <input id="message" name="message" value={@text} class={"#{if !is_nil(@path), do: "border-transparent"} block w-full rounded-md border-gray-300 shadow-sm #{if is_nil(@path), do: "focus:border-indigo-500 focus:ring-indigo-500"} text-sm placeholder:text-gray-400 text-gray-900"} placeholder={if is_nil(@path), do: "drag pdf here to get started", else: "Ask a question..."} type="text" />
+                        <input id="message" name="message" value={@text} class={"#{if !is_nil(@path), do: "border-transparent"} block w-full rounded-md border-gray-300 shadow-sm #{if is_nil(@path), do: "focus:border-indigo-500 focus:ring-indigo-500"} text-sm placeholder:text-gray-400 text-gray-900"} placeholder={if is_nil(@path), do: "drag pdf here to get started", else: "Ask a question..."} type="text" autocomplete="off" spellcheck="false" autocapitalize="off" />
                       </div>
                     </div>
                     <div class="ml-1">
