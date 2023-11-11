@@ -9,6 +9,7 @@ defmodule Demo.Application do
   def start(_type, _args) do
     children = [
       DemoWeb.Telemetry,
+      {Nx.Serving, serving: cross(), name: CrossEncoder},
       {Nx.Serving, serving: serving(), name: SentenceTransformer},
       Demo.Repo,
       {DNSCluster, query: Application.get_env(:demo, :dns_cluster_query) || :ignore},
@@ -45,6 +46,17 @@ defmodule Demo.Application do
       output_attribute: :hidden_state,
       embedding_processor: :l2_norm,
       compile: [batch_size: 32, sequence_length: [32]],
+      defn_options: [compiler: EXLA]
+    )
+  end
+
+  def cross() do
+    repo = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    {:ok, model_info} = Bumblebee.load_model({:hf, repo})
+    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "bert-base-uncased"})
+
+    Demo.Encoder.cross_encoder(model_info, tokenizer,
+      compile: [batch_size: 32, sequence_length: [512]],
       defn_options: [compiler: EXLA]
     )
   end

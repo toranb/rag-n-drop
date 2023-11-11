@@ -27,13 +27,32 @@ defmodule Demo.Section do
     |> validate_required(@required_attrs)
   end
 
-  def search_document(document_id, embedding) do
+  def search_document_embedding(document_id, embedding) do
     from(s in Section,
+      select: {s.id, s.page, s.text, s.document_id},
       where: s.document_id == ^document_id,
       order_by: max_inner_product(s.embedding, ^embedding),
-      limit: 1
+      limit: 4
     )
     |> Demo.Repo.all()
-    |> List.first()
+  end
+
+  def search_document_text(document_id, search) do
+    from(s in Section,
+      select: {s.id, s.page, s.text, s.document_id},
+      where:
+        s.document_id == ^document_id and
+          fragment("to_tsvector('english', ?) @@ plainto_tsquery('english', ?)", s.text, ^search),
+      order_by: [
+        desc:
+          fragment(
+            "ts_rank_cd(to_tsvector('english', ?), plainto_tsquery('english', ?))",
+            s.text,
+            ^search
+          )
+      ],
+      limit: 4
+    )
+    |> Demo.Repo.all()
   end
 end

@@ -12,7 +12,7 @@ defmodule DemoWeb.PageLive do
 
     socket =
       socket
-      |> assign(task: nil, lookup: nil, filename: nil, messages: messages, version: version, documents: documents, result: nil, text: nil, loading: false, selected: nil, query: nil, transformer: nil, llama: nil, path: nil, focused: false, loadingpdf: false)
+      |> assign(encoder: nil, task: nil, lookup: nil, filename: nil, messages: messages, version: version, documents: documents, result: nil, text: nil, loading: false, selected: nil, query: nil, transformer: nil, llama: nil, path: nil, focused: false, loadingpdf: false)
       |> allow_upload(:document, accept: ~w(.pdf), progress: &handle_progress/3, auto_upload: true, max_entries: 1)
 
     {:ok, socket}
@@ -71,9 +71,36 @@ defmodule DemoWeb.PageLive do
 
   @impl true
   def handle_info({ref, {selected, question, %{embedding: embedding}}}, socket) when socket.assigns.lookup.ref == ref do
-    version = socket.assigns.version
+    sections = Demo.Section.search_document_embedding(selected.id, embedding)
+    others = Demo.Section.search_document_text(selected.id, question)
+    deduplicated = sections ++ others |> Enum.uniq_by(fn {id, _, _, _} -> id end)
 
-    section = Demo.Section.search_document(selected.id, embedding)
+    data =
+      deduplicated
+      |> Enum.map(fn {_id, _page, text, _} -> {question, text} end)
+
+    encoder =
+      Task.async(fn ->
+        section =
+          CrossEncoder
+          |> Nx.Serving.batched_run(data)
+          |> results()
+          |> Enum.zip(deduplicated)
+          |> Enum.map(fn {score, {id, page, text, document_id}} ->
+            %{id: id, page: page, text: text, document_id: document_id, score: score}
+          end)
+          |> Enum.sort(fn x, y -> x.score > y.score end)
+          |> List.first()
+
+        {question, section}
+      end)
+
+    {:noreply, assign(socket, lookup: nil, encoder: encoder)}
+  end
+
+  @impl true
+  def handle_info({ref, {question, section}}, socket) when socket.assigns.encoder.ref == ref do
+    version = socket.assigns.version
     document = socket.assigns.documents |> Enum.find(&(&1.id == section.document_id))
 
     prompt = """
@@ -91,7 +118,7 @@ defmodule DemoWeb.PageLive do
         {section, Replicate.Predictions.wait(prediction)}
       end)
 
-    {:noreply, assign(socket, lookup: nil, llama: llama, selected: document)}
+    {:noreply, assign(socket, encoder: nil, llama: llama, selected: document)}
   end
 
   @impl true
@@ -214,6 +241,8 @@ defmodule DemoWeb.PageLive do
       end)
     end)
   end
+
+  def results(%{results: results}), do: results
 
   @impl true
   def render(assigns) do
