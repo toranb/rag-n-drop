@@ -149,6 +149,7 @@ defmodule DemoWeb.PageLive do
     results
     |> Enum.reject(fn {text, _filepath, _embedding} -> text == "" end)
     |> Enum.each(fn {text, filepath, embedding} ->
+      filepath = Regex.replace(~r/.*(?=pdf\/\d+\/image-\d+\.png)/, filepath, "\\1")
       page = Regex.replace(~r/(?<p>)^(.*-)/, filepath, "\\1") |> String.replace(".png", "")
       %Demo.Section{}
       |> Demo.Section.changeset(%{filepath: filepath, page: page, text: text, document_id: document.id, embedding: embedding})
@@ -204,7 +205,8 @@ defmodule DemoWeb.PageLive do
       |> List.first()
 
     id = :rand.uniform(1000)
-    directory = "priv/pdf/#{id}"
+    pdfdir = Application.fetch_env!(:demo, :pdf_path)
+    directory = Path.join(pdfdir, "/#{id}")
     File.mkdir_p!(directory)
 
     query =

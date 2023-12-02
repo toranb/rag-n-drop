@@ -20,6 +20,8 @@ if System.get_env("PHX_SERVER") do
   config :demo, DemoWeb.Endpoint, server: true
 end
 
+config :demo, :pdf_path, System.get_env("PDFPATH", Path.join(:code.priv_dir(:demo), "/pdf"))
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

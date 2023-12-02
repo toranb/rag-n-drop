@@ -23,6 +23,10 @@ defmodule DemoWeb.Endpoint do
     gzip: false,
     only: DemoWeb.static_paths()
 
+  plug Plug.Static,
+    at: "/pdf",
+    from: System.get_env("PDFPATH", Path.join(:code.priv_dir(:demo), "/pdf"))
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do

@@ -3,7 +3,8 @@ defmodule DemoWeb.FileController do
 
   def show(conn, %{"doc" => doc, "filename" => filename}) do
     valid = Regex.match?(~r/^[^\/\\]+$/, filename)
-    file_path = Path.join(:code.priv_dir(:demo), "/pdf/#{doc}/#{filename}")
+    pdfdir = Application.fetch_env!(:demo, :pdf_path)
+    file_path = Path.join(pdfdir, "/#{doc}/#{filename}")
 
     if valid && File.exists?(file_path) do
       conn
