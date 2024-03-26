@@ -41,6 +41,7 @@ defmodule Demo.Encoder do
             {:sequence_length, sequence_length} = batch_key
 
             inputs = %{
+              "token_type_ids" => Nx.template({batch_size, sequence_length}, :u32),
               "input_ids" => Nx.template({batch_size, sequence_length}, :u32),
               "attention_mask" => Nx.template({batch_size, sequence_length}, :u32)
             }
@@ -62,10 +63,7 @@ defmodule Demo.Encoder do
 
       inputs =
         Nx.with_default_backend(Nx.BinaryBackend, fn ->
-          Bumblebee.apply_tokenizer(tokenizer, raw_input,
-            length: sequence_length,
-            return_token_type_ids: false
-          )
+          Bumblebee.apply_tokenizer(tokenizer, raw_input, length: sequence_length)
         end)
 
       batch_key = Shared.sequence_batch_key_for_inputs(inputs, sequence_length)
