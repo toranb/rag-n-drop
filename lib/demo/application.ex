@@ -53,7 +53,7 @@ defmodule Demo.Application do
   def cross() do
     repo = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     {:ok, model_info} = Bumblebee.load_model({:hf, repo})
-    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "bert-base-uncased"})
+    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "google-bert/bert-base-uncased"})
 
     Demo.Encoder.cross_encoder(model_info, tokenizer,
       compile: [batch_size: 32, sequence_length: [512]],
